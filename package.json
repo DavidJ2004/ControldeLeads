@@ -1,0 +1,24 @@
+{
+  "name": "control-de-leads",
+  "version": "1.0.0",
+  "description": "Sistema de gestión y análisis de leads con soporte para archivos CSV y Excel",
+  "main": "index.html",
+  "scripts": {
+    "dev": "http-server . -p 8000 -o",
+    "start": "http-server . -p 8000 -o",
+    "serve": "http-server . -p 8000"
+  },
+  "keywords": [
+    "leads",
+    "csv",
+    "excel",
+    "xlsx",
+    "bitrix24"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
+

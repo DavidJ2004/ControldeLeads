@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Leads - Análisis CSV/XLSX</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Control de Leads</h1>
+            <p class="subtitle">Analiza tu archivo CSV o Excel (XLSX) y obtén estadísticas de tus leads</p>
+        </header>
+
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <input type="file" id="csvFile" accept=".csv,.xlsx,.xls" multiple hidden>
+                <label for="csvFile" class="upload-label">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span class="upload-text">Haz clic para seleccionar archivos CSV o Excel (XLSX)</span>
+                    <span class="upload-hint">o arrastra uno o varios archivos aquí</span>
+                    <span class="upload-formats">Formatos soportados: .csv, .xlsx | Puedes cargar múltiples archivos</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <h2 id="totalLeads">0</h2>
+                    <p>Total de Leads</p>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <h3>Información del Archivo</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Nombre del archivo:</span>
+                        <span class="info-value" id="fileName">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Tipo de archivo:</span>
+                        <span class="info-value" id="fileType">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Tamaño:</span>
+                        <span class="info-value" id="fileSize">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Columnas detectadas:</span>
+                        <span class="info-value" id="columnCount">-</span>
+                    </div>
+                </div>
+                <div class="normalization-info">
+                </div>
+                <div id="filesInfoContainer" class="files-info-container"></div>
+            </div>
+
+            <div class="preview-section">
+                <div class="preview-header">
+                    <h3>Vista Previa de Leads</h3>
+                    <div class="preview-controls">
+                        <div class="view-buttons">
+                            <button id="btnViewAll" class="btn-view-toggle active" onclick="showAllLeads()">Ver Todos los Leads</button>
+                            <button id="btnViewForeign" class="btn-view-toggle" onclick="showForeignLeads()">Ver Solo Extranjeros</button>
+                        </div>
+                        <label for="previewRows">Mostrar:</label>
+                        <select id="previewRows" class="preview-select" onchange="changeRowsPerPage()">
+                            <option value="5">5 filas</option>
+                            <option value="10">10 filas</option>
+                            <option value="25">25 filas</option>
+                            <option value="50">50 filas</option>
+                            <option value="100">100 filas</option>
+                            <option value="all">Todas las filas</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-container" id="tableContainer">
+                    <table id="previewTable">
+                        <thead id="tableHead"></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination-container" id="paginationContainer"></div>
+            </div>
+
+            <div class="distribution-section">
+                <h3>📋 Distribución de Leads para Vendedores</h3>
+                <div class="distribution-controls">
+                    <div class="input-group">
+                        <label for="sellerCount">Número de vendedores:</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="sellerCount" min="2" max="100" value="2" placeholder="Ej: 3">
+                            <button class="btn-distribute" onclick="distributeLeads()">Dividir Leads</button>
+                        </div>
+                    </div>
+                    <div class="input-group" style="margin-top: 15px;">
+                        <label for="csvSeparator">Separador CSV (para Bitrix24):</label>
+                        <select id="csvSeparator" class="separator-select">
+                            <option value=",">Coma (,)</option>
+                            <option value=";">Punto y coma (;)</option>
+                        </select>
+                        <div class="bitrix-info">
+                            <span class="bitrix-badge">✓ Compatible con Bitrix24</span>
+                            <span class="bitrix-hint">Los archivos se generan en formato UTF-8 con BOM para importación en Bitrix24</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="distribution-results" id="distributionResults" style="display: none;">
+                    <h4>Distribución de Leads</h4>
+                    <div class="distribution-grid" id="distributionGrid"></div>
+                    <div class="download-section">
+                        <h4>Descargar Archivos CSV por Vendedor</h4>
+                        <div class="download-buttons" id="downloadButtons"></div>
+                        <button class="btn-download-all" onclick="downloadAllFiles()">📥 Descargar Todos los Archivos</button>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-reset" onclick="resetApp()">Cargar Otro Archivo</button>
+        </div>
+
+        <div class="error-message" id="errorMessage" style="display: none;"></div>
+    </div>
+
+    <!-- SheetJS (xlsx) para leer archivos Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Módulo principal -->
+    <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
