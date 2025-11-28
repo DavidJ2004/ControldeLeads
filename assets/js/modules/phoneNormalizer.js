@@ -105,6 +105,11 @@ export function normalizePhoneNumber(phone) {
     
     const phoneStr = String(phone).trim();
     
+    // Si es un valor por defecto, no normalizar
+    if (phoneStr.toLowerCase() === 'sin telefono' || phoneStr.toLowerCase() === 'sin teléfono') {
+        return phoneStr;
+    }
+    
     // Verificar si es un número ecuatoriano
     if (isEcuadorianNumber(phoneStr)) {
         // Normalizar número ecuatoriano a formato 0XXXXXXXXX

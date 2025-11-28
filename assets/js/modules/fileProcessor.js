@@ -1,6 +1,6 @@
 // Módulo para procesamiento de archivos CSV y Excel
 import { AppState } from './config.js';
-import { showError, hideError, formatFileSize } from './utils.js';
+import { showError, hideError, formatFileSize, fillEmptyValues } from './utils.js';
 import { normalizePhoneNumbers } from './phoneNormalizer.js';
 import { displayPreviewTable } from './previewManager.js';
 
@@ -260,8 +260,11 @@ function combineFilesData(results) {
         AppState.fileName = `${AppState.fileNames.length} archivos combinados`;
     }
     
+    // Llenar valores vacíos con valores por defecto
+    const dataWithDefaults = fillEmptyValues(combinedData);
+    
     // Normalizar números de teléfono
-    AppState.csvData = normalizePhoneNumbers(combinedData);
+    AppState.csvData = normalizePhoneNumbers(dataWithDefaults);
     
     // Mostrar resultados
     displayCombinedResults(combinedData, totalSize);
