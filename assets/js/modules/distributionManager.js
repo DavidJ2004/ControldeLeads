@@ -2,6 +2,8 @@
 import { AppState } from './config.js';
 import { showError } from './utils.js';
 import { downloadSellerCSV } from './csvExporter.js';
+import { saveLeadsToSupabase, isSupabaseConfigured } from './supabaseManager.js';
+import { detectPhoneColumns } from './phoneNormalizer.js';
 
 // Función para dividir los leads entre vendedores
 export function distributeLeads() {
@@ -49,6 +51,100 @@ export function distributeLeads() {
     }
     
     displayDistribution(AppState.distributedData);
+    
+    // Guardar automáticamente en Supabase si está configurado
+    if (isSupabaseConfigured()) {
+        console.log('🔵 Supabase configurado, iniciando guardado automático...');
+        saveLeadsToSupabaseAutomatically();
+    } else {
+        console.warn('⚠️ Supabase no está configurado. Los leads no se guardarán en la base de datos.');
+    }
+}
+
+// Función para guardar leads automáticamente en Supabase
+async function saveLeadsToSupabaseAutomatically() {
+    console.log('🔵 Iniciando guardado automático en Supabase...');
+    
+    if (!AppState.csvData || AppState.csvData.length === 0) {
+        console.warn('⚠️ No hay datos para guardar en Supabase.');
+        return;
+    }
+    
+    try {
+        // Detectar columna de teléfono
+        const headers = Object.keys(AppState.csvData[0]);
+        console.log('📋 Headers detectados:', headers);
+        
+        const phoneColumns = detectPhoneColumns(headers, AppState.csvData);
+        console.log('📞 Columnas de teléfono detectadas:', phoneColumns);
+        
+        if (phoneColumns.length === 0) {
+            console.warn('⚠️ No se encontró una columna de teléfono para guardar en Supabase.');
+            return;
+        }
+        
+        const phoneColumn = phoneColumns[0];
+        console.log('📞 Usando columna de teléfono:', phoneColumn);
+        
+        // Preparar leads para guardar
+        const leadsToSave = AppState.csvData.map(lead => ({
+            telefono: lead[phoneColumn] || '',
+            nombre: lead.nombre || lead.Nombre || lead.NOMBRE || 'sin nombre',
+            correo: lead.correo || lead.Correo || lead.CORREO || lead.email || lead.Email || 'sin correo',
+            provincia: lead.provincia || lead.Provincia || lead.PROVINCIA || lead.estado || lead.Estado || 'provincia o estado no especificado'
+        })).filter(lead => lead.telefono && lead.telefono !== 'sin telefono');
+        
+        console.log(`📊 Leads preparados para guardar: ${leadsToSave.length} de ${AppState.csvData.length}`);
+        
+        if (leadsToSave.length === 0) {
+            console.warn('⚠️ No hay leads válidos para guardar en Supabase.');
+            return;
+        }
+        
+        // Guardar en Supabase
+        console.log('💾 Guardando leads en Supabase...');
+        const result = await saveLeadsToSupabase(leadsToSave);
+        
+        if (result && result.success !== undefined) {
+            console.log(`✅ Supabase: ${result.saved} leads guardados, ${result.duplicates} duplicados, ${result.errors} errores`);
+            
+            // Mostrar mensaje discreto en la interfaz
+            showSupabaseSaveMessage(result);
+        } else if (result && result.error) {
+            console.error('❌ Error al guardar en Supabase:', result.error);
+            showSupabaseSaveMessage({ saved: 0, duplicates: 0, errors: leadsToSave.length, error: result.error });
+        } else {
+            console.error('❌ Error desconocido al guardar en Supabase:', result);
+        }
+    } catch (error) {
+        console.error('❌ Excepción al guardar leads en Supabase:', error);
+        console.error('Stack trace:', error.stack);
+    }
+}
+
+// Función para mostrar mensaje discreto de guardado
+function showSupabaseSaveMessage(result) {
+    const distributionResults = document.getElementById('distributionResults');
+    if (!distributionResults) return;
+    
+    // Buscar si ya existe un mensaje de Supabase
+    let supabaseMessage = document.getElementById('supabaseSaveMessage');
+    
+    if (!supabaseMessage) {
+        supabaseMessage = document.createElement('div');
+        supabaseMessage.id = 'supabaseSaveMessage';
+        supabaseMessage.style.cssText = 'margin-top: 15px; padding: 12px; background: #e8f5e9; border-left: 4px solid #28a745; border-radius: 6px; font-size: 0.9em;';
+        distributionResults.insertBefore(supabaseMessage, distributionResults.firstChild);
+    }
+    
+    const savedText = result.saved > 0 ? `<strong style="color: #28a745;">✓ ${result.saved} guardados</strong>` : '';
+    const duplicateText = result.duplicates > 0 ? `<span style="color: #ff9800;">⚠ ${result.duplicates} duplicados</span>` : '';
+    const errorText = result.errors > 0 ? `<span style="color: #f44336;">✗ ${result.errors} errores</span>` : '';
+    
+    supabaseMessage.innerHTML = `
+        <span style="color: #28a745;">💾 Guardado en Supabase:</span> 
+        ${savedText} ${duplicateText} ${errorText}
+    `;
 }
 
 // Función para mostrar la distribución

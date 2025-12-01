@@ -739,6 +739,80 @@ tbody tr:last-child td {
     transform: translateY(0);
 }
 
+.btn-download-report {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    box-shadow: 0 3px 10px rgba(40, 167, 69, 0.3);
+    margin-left: 10px;
+}
+
+.btn-download-report:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+    background: linear-gradient(135deg, #20c997 0%, #28a745 100%);
+}
+
+.btn-download-report:active {
+    transform: translateY(0);
+}
+
+.supabase-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.supabase-section h4 {
+    color: #333;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+
+.btn-save-supabase {
+    padding: 12px 25px;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 3px 10px rgba(40, 167, 69, 0.3);
+    width: 100%;
+    max-width: 400px;
+}
+
+.btn-save-supabase:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+    background: linear-gradient(135deg, #20c997 0%, #28a745 100%);
+}
+
+.btn-save-supabase:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-save-supabase:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.supabase-status {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.95em;
+}
+
 @media (max-width: 768px) {
     .container {
         padding: 20px;

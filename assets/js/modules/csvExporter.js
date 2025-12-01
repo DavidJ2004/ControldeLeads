@@ -98,3 +98,52 @@ export function downloadAllFiles() {
     });
 }
 
+// Función para descargar todos los leads cargados (reporte completo)
+export function downloadAllLeadsReport() {
+    if (!AppState.csvData || AppState.csvData.length === 0) {
+        showError('No hay leads cargados para descargar.');
+        return;
+    }
+    
+    // Obtener el separador seleccionado
+    const separator = document.getElementById('csvSeparator')?.value || ',';
+    
+    // Crear contenido CSV compatible con Bitrix24
+    const csvContent = createBitrix24CSV(AppState.originalHeaders, AppState.csvData, separator);
+    
+    // Crear blob con codificación UTF-8
+    const blob = new Blob([csvContent], { 
+        type: 'text/csv;charset=utf-8;' 
+    });
+    
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    // Generar nombre del archivo con fecha
+    const now = new Date();
+    // Formato de fecha: DD-MM-YYYY
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const dateStr = `${day}-${month}-${year}`;
+    const fileName = `reporte de leads ${dateStr}.csv`;
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    link.style.visibility = 'hidden';
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    
+    // Usar requestAnimationFrame para asegurar que el click se procese antes de revocar
+    requestAnimationFrame(() => {
+        link.click();
+        
+        // Liberar la URL del objeto después de un breve delay
+        setTimeout(() => {
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }, 100);
+    });
+}
+

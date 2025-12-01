@@ -82,6 +82,9 @@
                             <option value="100">100 filas</option>
                             <option value="all">Todas las filas</option>
                         </select>
+                        <button class="btn-download-report" onclick="downloadAllLeadsReport()" title="Descargar reporte completo de todos los leads">
+                            📊 Descargar Reporte Completo
+                        </button>
                     </div>
                 </div>
                 <div class="table-container" id="tableContainer">
@@ -135,6 +138,8 @@
 
     <!-- SheetJS (xlsx) para leer archivos Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Módulo principal -->
     <script type="module" src="assets/js/main.js"></script>
 </body>

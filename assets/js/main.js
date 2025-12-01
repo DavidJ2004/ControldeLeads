@@ -4,7 +4,7 @@ import { isValidFileType, showError, hideError } from './modules/utils.js';
 import { processFiles } from './modules/fileProcessor.js';
 import { changeRowsPerPage, showAllLeads, showForeignLeads } from './modules/previewManager.js';
 import { distributeLeads } from './modules/distributionManager.js';
-import { downloadAllFiles } from './modules/csvExporter.js';
+import { downloadAllFiles, downloadAllLeadsReport } from './modules/csvExporter.js';
 
 // Verificar si estamos en un servidor HTTP
 function checkServerProtocol() {
@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window.changeRowsPerPage = changeRowsPerPage;
         window.distributeLeads = distributeLeads;
         window.downloadAllFiles = downloadAllFiles;
+        window.downloadAllLeadsReport = downloadAllLeadsReport;
         window.resetApp = resetApp;
         
         console.log('Aplicación inicializada correctamente');
