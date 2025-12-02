@@ -2,11 +2,11 @@
 import { AppState } from './config.js';
 import { showError } from './utils.js';
 import { downloadSellerCSV } from './csvExporter.js';
-import { saveLeadsToSupabase, isSupabaseConfigured } from './supabaseManager.js';
+import { saveLeadsToSupabase, isSupabaseConfigured, checkDuplicatePhone } from './supabaseManager.js';
 import { detectPhoneColumns } from './phoneNormalizer.js';
 
 // Función para dividir los leads entre vendedores
-export function distributeLeads() {
+export async function distributeLeads() {
     const sellerCountInput = document.getElementById('sellerCount');
     const sellerCount = parseInt(sellerCountInput.value);
     
@@ -31,6 +31,12 @@ export function distributeLeads() {
     // Calcular cuántos leads por vendedor
     const leadsPerSeller = Math.floor(shuffledData.length / sellerCount);
     const remainder = shuffledData.length % sellerCount;
+    
+    // Verificar duplicados ANTES de distribuir si Supabase está configurado
+    if (isSupabaseConfigured()) {
+        console.log('🔵 Verificando duplicados antes de distribuir...');
+        await checkAndDisplayDuplicates();
+    }
     
     // Distribuir los leads
     AppState.distributedData = [];
@@ -108,8 +114,14 @@ async function saveLeadsToSupabaseAutomatically() {
         if (result && result.success !== undefined) {
             console.log(`✅ Supabase: ${result.saved} leads guardados, ${result.duplicates} duplicados, ${result.errors} errores`);
             
+            // Guardar detalles de leads no agregados en AppState
+            AppState.supabaseSaveResult = result;
+            
             // Mostrar mensaje discreto en la interfaz
             showSupabaseSaveMessage(result);
+            
+            // Mostrar leads no agregados
+            displayNotAddedLeads(result, AppState.csvData, phoneColumn);
         } else if (result && result.error) {
             console.error('❌ Error al guardar en Supabase:', result.error);
             showSupabaseSaveMessage({ saved: 0, duplicates: 0, errors: leadsToSave.length, error: result.error });
@@ -147,14 +159,309 @@ function showSupabaseSaveMessage(result) {
     `;
 }
 
+// Función para mostrar leads no agregados (duplicados y errores)
+function displayNotAddedLeads(result, allLeads, phoneColumn) {
+    // Solo mostrar si hay duplicados o errores
+    if (result.duplicates === 0 && result.errors === 0) {
+        return;
+    }
+    
+    const distributionResults = document.getElementById('distributionResults');
+    if (!distributionResults) return;
+    
+    // Eliminar sección anterior si existe
+    const existingSection = document.getElementById('notAddedLeadsSection');
+    if (existingSection) {
+        existingSection.remove();
+    }
+    
+    // Crear contenedor para leads no agregados
+    const section = document.createElement('div');
+    section.id = 'notAddedLeadsSection';
+    section.style.cssText = 'margin-top: 30px; padding: 20px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;';
+    
+    // Crear mapa de teléfonos para buscar los leads completos
+    const phoneToLeadMap = new Map();
+    allLeads.forEach(lead => {
+        const phone = lead[phoneColumn] || '';
+        if (phone && phone !== 'sin telefono') {
+            phoneToLeadMap.set(phone, lead);
+        }
+    });
+    
+    // Separar duplicados y errores
+    const duplicateLeads = [];
+    const errorLeads = [];
+    
+    result.details.forEach(detail => {
+        const lead = phoneToLeadMap.get(detail.telefono);
+        if (lead) {
+            if (detail.status === 'duplicate') {
+                duplicateLeads.push(lead);
+            } else if (detail.status === 'error') {
+                errorLeads.push({ lead, error: detail.error });
+            }
+        }
+    });
+    
+    // Construir HTML
+    let html = '<h4 style="margin-top: 0; color: #856404;">📋 Leads No Agregados a Supabase</h4>';
+    
+    // Mostrar duplicados
+    if (duplicateLeads.length > 0) {
+        html += `<div style="margin-bottom: 20px;">
+            <h5 style="color: #ff9800; margin-bottom: 10px;">⚠️ Duplicados (${duplicateLeads.length})</h5>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                    <thead>
+                        <tr style="background: #f5f5f5; position: sticky; top: 0;">
+                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Teléfono</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Nombre</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Correo</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Provincia</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+        duplicateLeads.forEach(lead => {
+            const phone = lead[phoneColumn] || 'sin telefono';
+            const nombre = lead.nombre || lead.Nombre || lead.NOMBRE || 'sin nombre';
+            const correo = lead.correo || lead.Correo || lead.CORREO || lead.email || lead.Email || 'sin correo';
+            const provincia = lead.provincia || lead.Provincia || lead.PROVINCIA || lead.estado || lead.Estado || 'provincia o estado no especificado';
+            
+            html += `<tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 8px;">${phone}</td>
+                <td style="padding: 8px;">${nombre}</td>
+                <td style="padding: 8px;">${correo}</td>
+                <td style="padding: 8px;">${provincia}</td>
+            </tr>`;
+        });
+        
+        html += `</tbody></table></div>
+            <p style="margin-top: 10px; font-size: 0.85em; color: #666;">Estos leads ya existen en la base de datos.</p>
+        </div>`;
+    }
+    
+    // Mostrar errores
+    if (errorLeads.length > 0) {
+        html += `<div>
+            <h5 style="color: #f44336; margin-bottom: 10px;">❌ Errores (${errorLeads.length})</h5>
+            <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+                    <thead>
+                        <tr style="background: #f5f5f5; position: sticky; top: 0;">
+                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Teléfono</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Nombre</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Correo</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Provincia</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+        
+        errorLeads.forEach(({ lead, error }) => {
+            const phone = lead[phoneColumn] || 'sin telefono';
+            const nombre = lead.nombre || lead.Nombre || lead.NOMBRE || 'sin nombre';
+            const correo = lead.correo || lead.Correo || lead.CORREO || lead.email || lead.Email || 'sin correo';
+            const provincia = lead.provincia || lead.Provincia || lead.PROVINCIA || lead.estado || lead.Estado || 'provincia o estado no especificado';
+            const errorMsg = error || 'Error desconocido';
+            
+            html += `<tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 8px;">${phone}</td>
+                <td style="padding: 8px;">${nombre}</td>
+                <td style="padding: 8px;">${correo}</td>
+                <td style="padding: 8px;">${provincia}</td>
+                <td style="padding: 8px; color: #f44336; font-size: 0.85em;">${errorMsg}</td>
+            </tr>`;
+        });
+        
+        html += `</tbody></table></div>
+            <p style="margin-top: 10px; font-size: 0.85em; color: #666;">Estos leads no se pudieron guardar debido a errores.</p>
+        </div>`;
+    }
+    
+    section.innerHTML = html;
+    
+    // Insertar después de los botones de descarga
+    const downloadSection = distributionResults.querySelector('.download-section');
+    if (downloadSection) {
+        downloadSection.insertAdjacentElement('afterend', section);
+    } else {
+        distributionResults.appendChild(section);
+    }
+}
+
+// Función para verificar y mostrar duplicados antes de distribuir
+async function checkAndDisplayDuplicates() {
+    if (!AppState.csvData || AppState.csvData.length === 0) {
+        return;
+    }
+    
+    try {
+        // Detectar columna de teléfono
+        const headers = Object.keys(AppState.csvData[0]);
+        const phoneColumns = detectPhoneColumns(headers, AppState.csvData);
+        
+        if (phoneColumns.length === 0) {
+            return;
+        }
+        
+        const phoneColumn = phoneColumns[0];
+        
+        // Verificar duplicados
+        const duplicateLeads = [];
+        const totalLeads = AppState.csvData.length;
+        
+        console.log('🔍 Verificando duplicados...');
+        
+        // Verificar cada lead
+        for (let i = 0; i < AppState.csvData.length; i++) {
+            const lead = AppState.csvData[i];
+            const phone = lead[phoneColumn] || '';
+            
+            if (phone && phone !== 'sin telefono') {
+                const isDuplicate = await checkDuplicatePhone(phone);
+                if (isDuplicate) {
+                    duplicateLeads.push(lead);
+                }
+            }
+            
+            // Mostrar progreso cada 10 leads
+            if ((i + 1) % 10 === 0 || i === AppState.csvData.length - 1) {
+                console.log(`📊 Verificando: ${i + 1}/${totalLeads} leads...`);
+            }
+        }
+        
+        // Mostrar tabla de duplicados si hay
+        if (duplicateLeads.length > 0) {
+            displayDuplicatesTable(duplicateLeads, phoneColumn, headers);
+        }
+    } catch (error) {
+        console.error('Error al verificar duplicados:', error);
+    }
+}
+
+// Función para mostrar tabla de duplicados similar a la vista previa
+function displayDuplicatesTable(duplicateLeads, phoneColumn, headers) {
+    const distributionResults = document.getElementById('distributionResults');
+    if (!distributionResults) return;
+    
+    // Eliminar sección anterior si existe
+    const existingSection = document.getElementById('duplicatesTableSection');
+    if (existingSection) {
+        existingSection.remove();
+    }
+    
+    // Crear contenedor principal
+    const section = document.createElement('div');
+    section.id = 'duplicatesTableSection';
+    section.style.cssText = 'margin-bottom: 30px;';
+    
+    // Título con cantidad destacada
+    const titleDiv = document.createElement('div');
+    titleDiv.style.cssText = 'margin-bottom: 20px; padding: 15px; background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); border-radius: 10px; color: white; text-align: center;';
+    titleDiv.innerHTML = `
+        <h3 style="margin: 0 0 10px 0; font-size: 1.3em;">⚠️ Leads Duplicados Detectados</h3>
+        <div style="font-size: 2em; font-weight: bold; margin: 10px 0;">${duplicateLeads.length}</div>
+        <p style="margin: 0; font-size: 0.9em; opacity: 0.9;">Estos leads ya existen en la base de datos y no se guardarán nuevamente</p>
+    `;
+    section.appendChild(titleDiv);
+    
+    // Crear tabla similar a la vista previa
+    const tableContainer = document.createElement('div');
+    tableContainer.className = 'table-container';
+    tableContainer.style.cssText = 'max-height: 400px;';
+    
+    const table = document.createElement('table');
+    
+    // Crear encabezados
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    
+    // Encabezados principales
+    const mainHeaders = ['Correo electrónico', 'Nombre', 'Número de teléfono', 'Provincia/Estado'];
+    mainHeaders.forEach(headerText => {
+        const th = document.createElement('th');
+        th.textContent = headerText;
+        th.style.cssText = 'padding: 12px; text-align: left; font-weight: 600;';
+        headerRow.appendChild(th);
+    });
+    
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    // Crear cuerpo de la tabla
+    const tbody = document.createElement('tbody');
+    tbody.id = 'duplicatesTableBody';
+    
+    duplicateLeads.forEach(lead => {
+        const row = document.createElement('tr');
+        row.style.cssText = 'border-bottom: 1px solid #eee;';
+        
+        // Correo
+        const emailCell = document.createElement('td');
+        emailCell.textContent = lead.correo || lead.Correo || lead.CORREO || lead.email || lead.Email || 'sin correo';
+        emailCell.style.cssText = 'padding: 12px;';
+        row.appendChild(emailCell);
+        
+        // Nombre
+        const nameCell = document.createElement('td');
+        nameCell.textContent = lead.nombre || lead.Nombre || lead.NOMBRE || 'sin nombre';
+        nameCell.style.cssText = 'padding: 12px;';
+        row.appendChild(nameCell);
+        
+        // Teléfono
+        const phoneCell = document.createElement('td');
+        phoneCell.textContent = lead[phoneColumn] || 'sin telefono';
+        phoneCell.style.cssText = 'padding: 12px;';
+        row.appendChild(phoneCell);
+        
+        // Provincia
+        const provinceCell = document.createElement('td');
+        provinceCell.textContent = lead.provincia || lead.Provincia || lead.PROVINCIA || lead.estado || lead.Estado || 'provincia o estado no especificado';
+        provinceCell.style.cssText = 'padding: 12px;';
+        row.appendChild(provinceCell);
+        
+        tbody.appendChild(row);
+    });
+    
+    table.appendChild(tbody);
+    tableContainer.appendChild(table);
+    section.appendChild(tableContainer);
+    
+    // Insertar ANTES del título "Distribución de Leads"
+    const distributionTitle = distributionResults.querySelector('h4');
+    if (distributionTitle) {
+        distributionTitle.insertAdjacentElement('beforebegin', section);
+    } else {
+        distributionResults.insertBefore(section, distributionResults.firstChild);
+    }
+}
+
 // Función para mostrar la distribución
 export function displayDistribution(distribution) {
     const distributionGrid = document.getElementById('distributionGrid');
     const downloadButtons = document.getElementById('downloadButtons');
     
-    // Limpiar contenido anterior
+    // Limpiar contenido anterior (pero mantener la sección de duplicados)
     distributionGrid.innerHTML = '';
     downloadButtons.innerHTML = '';
+    
+    // Asegurar que el título "Distribución de Leads" esté presente
+    const distResults = document.getElementById('distributionResults');
+    if (distResults) {
+        let distributionTitle = distResults.querySelector('h4');
+        if (!distributionTitle) {
+            distributionTitle = document.createElement('h4');
+            distributionTitle.textContent = 'Distribución de Leads';
+            const duplicatesSection = document.getElementById('duplicatesTableSection');
+            if (duplicatesSection) {
+                duplicatesSection.insertAdjacentElement('afterend', distributionTitle);
+            } else {
+                distResults.insertBefore(distributionTitle, distResults.firstChild);
+            }
+        }
+    }
     
     // Mostrar tarjetas de distribución
     distribution.forEach(seller => {
@@ -176,10 +483,9 @@ export function displayDistribution(distribution) {
     });
     
     // Mostrar sección de resultados
-    const distributionResults = document.getElementById('distributionResults');
-    if (distributionResults) {
-        distributionResults.style.display = 'block';
-        distributionResults.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (distResults) {
+        distResults.style.display = 'block';
+        distResults.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 

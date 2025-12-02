@@ -176,11 +176,24 @@ function resetApp() {
     AppState.currentPage = 1;
     AppState.showOnlyForeign = false;
     AppState.loadedFiles = [];
+    AppState.supabaseSaveResult = null;
     
     // Limpiar información de archivos
     const filesInfoContainer = document.getElementById('filesInfoContainer');
     if (filesInfoContainer) {
         filesInfoContainer.innerHTML = '';
+    }
+    
+    // Limpiar sección de leads no agregados
+    const notAddedSection = document.getElementById('notAddedLeadsSection');
+    if (notAddedSection) {
+        notAddedSection.remove();
+    }
+    
+    // Limpiar mensaje de Supabase
+    const supabaseMessage = document.getElementById('supabaseSaveMessage');
+    if (supabaseMessage) {
+        supabaseMessage.remove();
     }
     
     if (resultsSection) {

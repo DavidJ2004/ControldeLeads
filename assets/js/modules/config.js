@@ -10,7 +10,8 @@ export const AppState = {
     currentPage: 1,
     showOnlyForeign: false,
     allLeadsData: null,
-    loadedFiles: [] // Información de archivos cargados
+    loadedFiles: [], // Información de archivos cargados
+    supabaseSaveResult: null // Resultados del guardado en Supabase
 };
 
 // Referencias a elementos del DOM
